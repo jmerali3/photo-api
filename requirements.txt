@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+boto3
+pydantic
+pydantic-settings
+python-multipart
+temporalio
+Pillow
+requests
+python-jose[cryptography]
+passlib[bcrypt]
