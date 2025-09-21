@@ -4,13 +4,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from temporalio.client import Client
 
-from .settings import get_settings
+from .settings import get_settings, Settings
 from .middleware import SecurityHeadersMiddleware
 from .routers import health, uploads, jobs
 
-settings = get_settings()
+settings: Settings = get_settings()
 
-app = FastAPI(title="photo-api", version=settings.api_version)
+app: FastAPI = FastAPI(title="photo-api", version=settings.api_version)
 
 # Add security headers middleware
 app.add_middleware(SecurityHeadersMiddleware)
@@ -32,9 +32,10 @@ app.include_router(jobs.router)
 temporal_client: Optional[Client] = None
 
 @app.on_event("startup")
-async def on_startup():
+async def on_startup() -> None:
+    """Initialize connections on app startup."""
     global temporal_client
-    s = get_settings()
+    s: Settings = get_settings()
     temporal_client = await Client.connect(
         target_host=s.temporal_target, namespace=s.temporal_namespace
     )
@@ -42,7 +43,8 @@ async def on_startup():
     jobs.set_temporal_client(temporal_client)
 
 @app.on_event("shutdown")
-async def on_shutdown():
+async def on_shutdown() -> None:
+    """Clean up connections on app shutdown."""
     global temporal_client
     if temporal_client:
         await temporal_client.close()

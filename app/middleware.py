@@ -1,10 +1,11 @@
 from fastapi import Request, Response
-from fastapi.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """
-    Add security headers to all responses
+    Add security headers to all responses.
+    Uses Starlette's BaseHTTPMiddleware for better performance.
     """
     def __init__(self, app: ASGIApp):
         super().__init__(app)

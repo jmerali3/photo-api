@@ -1,16 +1,16 @@
-from typing import Optional
+from typing import Optional, Dict, Any
 from fastapi import HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from .settings import get_settings
+from .settings import get_settings, Settings
 
-security = HTTPBearer()
+security: HTTPBearer = HTTPBearer()
 
 def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security)) -> bool:
     """
     Verify API key from Authorization header.
     Expected format: Authorization: Bearer <api_key>
     """
-    settings = get_settings()
+    settings: Settings = get_settings()
 
     if not credentials:
         raise HTTPException(
@@ -26,7 +26,7 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security
 
     return True
 
-def get_current_user(auth: bool = Depends(verify_api_key)) -> dict:
+def get_current_user(auth: bool = Depends(verify_api_key)) -> Dict[str, Any]:
     """
     Simple user context for authenticated requests.
     Since this is single-user, we just return a basic user object.

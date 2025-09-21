@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generate a secure API key for the photo-api.
-Run this script to generate a new API key for production use.
+Run this script to generate a new API key for production use Only one client (self) so this is fine fo rnow.
 """
 
 import secrets
