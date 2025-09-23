@@ -1,5 +1,5 @@
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
@@ -15,12 +15,15 @@ async def list_jobs(
     status: Optional[str] = Query(None),
     job_type: Optional[str] = Query(None),
     current_user: Dict[str, Any] = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: Optional[AsyncSession] = Depends(get_db)
 ) -> Dict[str, Any]:
     """
     List job logs with optional filtering.
     Admin endpoint for viewing job history and status.
     """
+    if not db:
+        raise HTTPException(503, "Database not available")
+
     query = select(JobLog)
 
     # Apply filters

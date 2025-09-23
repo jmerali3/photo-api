@@ -28,7 +28,7 @@ def set_temporal_client(client: Client) -> None:
 async def start_from_upload(
     req: FromUploadRequest,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: Optional[AsyncSession] = Depends(get_db)
 ) -> JobStatus:
     """Start an image processing job from an uploaded S3 object."""
     s: Settings = get_settings()
@@ -48,23 +48,25 @@ async def start_from_upload(
     # Extract filename from S3 key
     filename: str = req.key.split('/')[-1]
 
-    # Create job log entry
-    job_log = JobLog(
-        job_id=job_id,
-        job_type="upload",
-        filename=filename,
-        s3_key=req.key,
-        content_type=obj_info.get('ContentType'),
-        job_metadata=json.dumps(req.job_metadata) if req.job_metadata else None,
-        temporal_workflow_id=job_id,
-        temporal_task_queue=s.temporal_task_queue,
-        started_at=datetime.utcnow(),
-        status="submitted"
-    )
+    # Create job log entry (if database is available)
+    job_log = None
+    if db:
+        job_log = JobLog(
+            job_id=job_id,
+            job_type="upload",
+            filename=filename,
+            s3_key=req.key,
+            content_type=obj_info.get('ContentType'),
+            job_metadata=json.dumps(req.job_metadata) if req.job_metadata else None,
+            temporal_workflow_id=job_id,
+            temporal_task_queue=s.temporal_task_queue,
+            started_at=datetime.utcnow(),
+            status="submitted"
+        )
 
-    db.add(job_log)
-    await db.commit()
-    await db.refresh(job_log)
+        db.add(job_log)
+        await db.commit()
+        await db.refresh(job_log)
 
     # Start Temporal workflow
     try:
@@ -80,15 +82,17 @@ async def start_from_upload(
             ),
         )
 
-        # Update status to started
-        job_log.status = "started"
-        await db.commit()
+        # Update status to started (if database is available)
+        if db and job_log:
+            job_log.status = "started"
+            await db.commit()
 
     except Exception as e:
-        # Update status to failed
-        job_log.status = "failed"
-        job_log.error_message = str(e)
-        await db.commit()
+        # Update status to failed (if database is available)
+        if db and job_log:
+            job_log.status = "failed"
+            job_log.error_message = str(e)
+            await db.commit()
         raise HTTPException(500, f"Failed to start workflow: {str(e)}")
 
     return JobStatus(job_id=job_id, status="started")
@@ -97,7 +101,7 @@ async def start_from_upload(
 async def start_from_url(
     req: FromURLRequest,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: Optional[AsyncSession] = Depends(get_db)
 ) -> JobStatus:
     """Start an image processing job from a URL."""
     s: Settings = get_settings()
@@ -106,22 +110,24 @@ async def start_from_url(
 
     job_id: str = f"img-{uuid.uuid4()}"
 
-    # Create job log entry
-    job_log = JobLog(
-        job_id=job_id,
-        job_type="url",
-        filename=req.filename,
-        source_url=req.url,
-        job_metadata=json.dumps(req.job_metadata) if req.job_metadata else None,
-        temporal_workflow_id=job_id,
-        temporal_task_queue=s.temporal_task_queue,
-        started_at=datetime.utcnow(),
-        status="submitted"
-    )
+    # Create job log entry (if database is available)
+    job_log = None
+    if db:
+        job_log = JobLog(
+            job_id=job_id,
+            job_type="url",
+            filename=req.filename,
+            source_url=req.url,
+            job_metadata=json.dumps(req.job_metadata) if req.job_metadata else None,
+            temporal_workflow_id=job_id,
+            temporal_task_queue=s.temporal_task_queue,
+            started_at=datetime.utcnow(),
+            status="submitted"
+        )
 
-    db.add(job_log)
-    await db.commit()
-    await db.refresh(job_log)
+        db.add(job_log)
+        await db.commit()
+        await db.refresh(job_log)
 
     # Start Temporal workflow
     try:
@@ -137,15 +143,17 @@ async def start_from_url(
             ),
         )
 
-        # Update status to started
-        job_log.status = "started"
-        await db.commit()
+        # Update status to started (if database is available)
+        if db and job_log:
+            job_log.status = "started"
+            await db.commit()
 
     except Exception as e:
-        # Update status to failed
-        job_log.status = "failed"
-        job_log.error_message = str(e)
-        await db.commit()
+        # Update status to failed (if database is available)
+        if db and job_log:
+            job_log.status = "failed"
+            job_log.error_message = str(e)
+            await db.commit()
         raise HTTPException(500, f"Failed to start workflow: {str(e)}")
 
     return JobStatus(job_id=job_id, status="started")
@@ -154,16 +162,18 @@ async def start_from_url(
 async def job_status(
     job_id: str,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: Optional[AsyncSession] = Depends(get_db)
 ) -> JobStatus:
     """Get the status and result of a job."""
     if not temporal_client:
         raise HTTPException(500, "Temporal client not initialized")
 
-    # Get job log from database
-    job_log = await db.get(JobLog, job_id)
-    if not job_log:
-        raise HTTPException(404, f"Job not found: {job_id}")
+    # Get job log from database (if available)
+    job_log = None
+    if db:
+        job_log = await db.get(JobLog, job_id)
+        if not job_log:
+            raise HTTPException(404, f"Job not found: {job_id}")
 
     try:
         handle = temporal_client.get_workflow_handle(job_id)
@@ -173,15 +183,15 @@ async def job_status(
 
         if status == "completed":
             result = await handle.result()
-            # Update database with completion
-            if job_log.status != "completed":
+            # Update database with completion (if available)
+            if db and job_log and job_log.status != "completed":
                 job_log.status = "completed"
                 job_log.completed_at = datetime.utcnow()
                 await db.commit()
 
         elif status == "failed":
-            # Update database with failure
-            if job_log.status != "failed":
+            # Update database with failure (if available)
+            if db and job_log and job_log.status != "failed":
                 job_log.status = "failed"
                 job_log.completed_at = datetime.utcnow()
                 try:
@@ -192,8 +202,8 @@ async def job_status(
                 await db.commit()
 
         elif status in ["running", "continued_as_new"]:
-            # Update status if it changed
-            if job_log.status != "running":
+            # Update status if it changed (if database available)
+            if db and job_log and job_log.status != "running":
                 job_log.status = "running"
                 await db.commit()
 
@@ -201,7 +211,8 @@ async def job_status(
 
     except Exception as e:
         # Job might be deleted from Temporal but still in our DB
-        job_log.status = "unknown"
-        job_log.error_message = f"Temporal query failed: {str(e)}"
-        await db.commit()
+        if db and job_log:
+            job_log.status = "unknown"
+            job_log.error_message = f"Temporal query failed: {str(e)}"
+            await db.commit()
         raise HTTPException(404, f"Job not found in Temporal: {job_id}")

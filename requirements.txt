@@ -9,6 +9,7 @@ Pillow
 requests
 python-jose[cryptography]
 passlib[bcrypt]
-sqlalchemy
+sqlalchemy[asyncio]
 asyncpg
 alembic
+greenlet
