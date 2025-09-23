@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # Authentication
     api_key: str = Field(default="your-secret-api-key-here")
 
+    # Database
+    database_url: str = Field(default="postgresql+asyncpg://photo_user:photo_pass@localhost:5432/photo_db")
+
     @property
     def cors_origins_list(self) -> List[str]:
         if self.cors_origins == "*":

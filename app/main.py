@@ -6,7 +6,8 @@ from temporalio.client import Client
 
 from .settings import get_settings, Settings
 from .middleware import SecurityHeadersMiddleware
-from .routers import health, uploads, jobs
+from .routers import health, uploads, jobs, admin
+from .database import create_tables, close_db
 
 settings: Settings = get_settings()
 
@@ -28,6 +29,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(uploads.router)
 app.include_router(jobs.router)
+app.include_router(admin.router)
 
 temporal_client: Optional[Client] = None
 
@@ -36,6 +38,11 @@ async def on_startup() -> None:
     """Initialize connections on app startup."""
     global temporal_client
     s: Settings = get_settings()
+
+    # Initialize database tables
+    await create_tables()
+
+    # Initialize Temporal client
     temporal_client = await Client.connect(
         target_host=s.temporal_target, namespace=s.temporal_namespace
     )
@@ -48,3 +55,6 @@ async def on_shutdown() -> None:
     global temporal_client
     if temporal_client:
         await temporal_client.close()
+
+    # Close database connections
+    await close_db()
