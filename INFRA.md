@@ -53,15 +53,15 @@ This document outlines the minimal AWS infrastructure needed to run the photo-ap
 
 ```bash
 # Raw images bucket
-aws s3 mb s3://your-company-photos-raw-prod --region us-west-2
+aws s3 mb s3://my-raw-upload-bucket-070703032025 --region us-west-2
 
 # Processed images bucket
-aws s3 mb s3://your-company-photos-processed-prod --region us-west-2
+aws s3 mb s3://my-ocr-processed-bucket-070703032025 --region us-west-2
 ```
 
 ### S3 Bucket Policies
 
-**Raw Bucket Policy** (`your-company-photos-raw-prod`):
+**Raw Bucket Policy** (`my-raw-upload-bucket-070703032025`):
 ```json
 {
     "Version": "2012-10-17",
@@ -78,7 +78,7 @@ aws s3 mb s3://your-company-photos-processed-prod --region us-west-2
                 "s3:DeleteObject",
                 "s3:GetObjectVersion"
             ],
-            "Resource": "arn:aws:s3:::your-company-photos-raw-prod/*"
+            "Resource": "arn:aws:s3:::my-raw-upload-bucket-070703032025/*"
         },
         {
             "Sid": "AllowListBucket",
@@ -87,13 +87,13 @@ aws s3 mb s3://your-company-photos-processed-prod --region us-west-2
                 "AWS": "arn:aws:iam::YOUR_ACCOUNT_ID:role/PhotoApiEC2Role"
             },
             "Action": "s3:ListBucket",
-            "Resource": "arn:aws:s3:::your-company-photos-raw-prod"
+            "Resource": "arn:aws:s3:::my-raw-upload-bucket-070703032025"
         }
     ]
 }
 ```
 
-**Processed Bucket Policy** (`your-company-photos-processed-prod`):
+**Processed Bucket Policy** (`my-ocr-processed-bucket-070703032025`):
 ```json
 {
     "Version": "2012-10-17",
@@ -110,7 +110,7 @@ aws s3 mb s3://your-company-photos-processed-prod --region us-west-2
                 "s3:DeleteObject",
                 "s3:GetObjectVersion"
             ],
-            "Resource": "arn:aws:s3:::your-company-photos-processed-prod/*"
+            "Resource": "arn:aws:s3:::my-ocr-processed-bucket-070703032025/*"
         },
         {
             "Sid": "AllowListBucket",
@@ -119,7 +119,7 @@ aws s3 mb s3://your-company-photos-processed-prod --region us-west-2
                 "AWS": "arn:aws:iam::YOUR_ACCOUNT_ID:role/PhotoApiEC2Role"
             },
             "Action": "s3:ListBucket",
-            "Resource": "arn:aws:s3:::your-company-photos-processed-prod"
+            "Resource": "arn:aws:s3:::my-ocr-processed-bucket-070703032025"
         }
     ]
 }
@@ -130,18 +130,18 @@ aws s3 mb s3://your-company-photos-processed-prod --region us-west-2
 **Enable versioning** (recommended for data protection):
 ```bash
 aws s3api put-bucket-versioning \
-    --bucket your-company-photos-raw-prod \
+    --bucket my-raw-upload-bucket-070703032025 \
     --versioning-configuration Status=Enabled
 
 aws s3api put-bucket-versioning \
-    --bucket your-company-photos-processed-prod \
+    --bucket my-ocr-processed-bucket-070703032025 \
     --versioning-configuration Status=Enabled
 ```
 
 **Block public access** (security):
 ```bash
 aws s3api put-public-access-block \
-    --bucket your-company-photos-raw-prod \
+    --bucket my-raw-upload-bucket-070703032025 \
     --public-access-block-configuration \
     BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
 ```
@@ -190,8 +190,8 @@ aws iam create-role \
                 "s3:GetBucketLocation"
             ],
             "Resource": [
-                "arn:aws:s3:::your-company-photos-raw-prod",
-                "arn:aws:s3:::your-company-photos-processed-prod"
+                "arn:aws:s3:::my-raw-upload-bucket-070703032025",
+                "arn:aws:s3:::my-ocr-processed-bucket-070703032025"
             ]
         },
         {
@@ -205,8 +205,8 @@ aws iam create-role \
                 "s3:PutObjectAcl"
             ],
             "Resource": [
-                "arn:aws:s3:::your-company-photos-raw-prod/*",
-                "arn:aws:s3:::your-company-photos-processed-prod/*"
+                "arn:aws:s3:::my-raw-upload-bucket-070703032025/*",
+                "arn:aws:s3:::my-ocr-processed-bucket-070703032025/*"
             ]
         },
         {
@@ -217,7 +217,7 @@ aws iam create-role \
                 "s3:PutObjectAcl"
             ],
             "Resource": [
-                "arn:aws:s3:::your-company-photos-raw-prod/*"
+                "arn:aws:s3:::my-raw-upload-bucket-070703032025/*"
             ]
         }
     ]
@@ -241,11 +241,11 @@ aws iam attach-role-policy \
 
 ```bash
 # Create instance profile
-aws iam create-instance-profile --instance-profile-name PhotoApiInstanceProfile
+aws iam create-instance-profile --instance-profile-name photo-dev-dev-api-instance-profile
 
 # Add role to instance profile
 aws iam add-role-to-instance-profile \
-    --instance-profile-name PhotoApiInstanceProfile \
+    --instance-profile-name photo-dev-dev-api-instance-profile \
     --role-name PhotoApiEC2Role
 ```
 
@@ -267,21 +267,21 @@ aws ec2 create-security-group \
 ```bash
 # SSH access (limit to your IP)
 aws ec2 authorize-security-group-ingress \
-    --group-id sg-YOUR_SG_ID \
+    --group-id sg-0c6b18fb20c16059d \
     --protocol tcp \
     --port 22 \
     --cidr YOUR_IP_ADDRESS/32
 
 # HTTP API access (port 8080)
 aws ec2 authorize-security-group-ingress \
-    --group-id sg-YOUR_SG_ID \
+    --group-id sg-0c6b18fb20c16059d \
     --protocol tcp \
     --port 8080 \
     --cidr 0.0.0.0/0
 
 # HTTPS (if using SSL termination)
 aws ec2 authorize-security-group-ingress \
-    --group-id sg-YOUR_SG_ID \
+    --group-id sg-0c6b18fb20c16059d \
     --protocol tcp \
     --port 443 \
     --cidr 0.0.0.0/0
@@ -300,9 +300,9 @@ aws ec2 run-instances \
     --count 1 \
     --instance-type t3.small \
     --key-name your-key-pair \
-    --security-group-ids sg-YOUR_SG_ID \
+    --security-group-ids sg-0c6b18fb20c16059d \
     --subnet-id subnet-YOUR_SUBNET_ID \
-    --iam-instance-profile Name=PhotoApiInstanceProfile \
+    --iam-instance-profile Name=photo-dev-dev-api-instance-profile \
     --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=photo-api-server}]'
 ```
 
@@ -344,9 +344,9 @@ sudo systemctl enable postgresql
 sudo -u postgres psql
 
 -- Create database and user
-CREATE DATABASE photo_db_prod;
-CREATE USER photo_user WITH PASSWORD 'your_secure_password_here';
-GRANT ALL PRIVILEGES ON DATABASE photo_db_prod TO photo_user;
+CREATE DATABASE photo_worker;
+CREATE USER appuser WITH PASSWORD '<sensitive>';
+GRANT ALL PRIVILEGES ON DATABASE photo_worker TO appuser;
 
 -- Exit PostgreSQL
 \q
@@ -364,7 +364,7 @@ listen_addresses = 'localhost'
 sudo nano /etc/postgresql/14/main/pg_hba.conf
 
 # Add this line for local connections:
-local   photo_db_prod   photo_user                  md5
+local   photo_worker   appuser                  md5
 
 # Restart PostgreSQL
 sudo systemctl restart postgresql
@@ -375,15 +375,15 @@ sudo systemctl restart postgresql
 **Create RDS instance:**
 ```bash
 aws rds create-db-instance \
-    --db-instance-identifier photo-api-db \
+    --db-instance-identifier photo-dev-dev-pg \
     --db-instance-class db.t3.micro \
     --engine postgres \
     --engine-version 15.4 \
-    --master-username photo_user \
-    --master-user-password YOUR_SECURE_PASSWORD \
+    --master-username appuser \
+    --master-user-password <sensitive> \
     --allocated-storage 20 \
     --storage-type gp2 \
-    --vpc-security-group-ids sg-YOUR_DB_SECURITY_GROUP \
+    --vpc-security-group-ids sg-0c8205f5e517d263d \
     --db-subnet-group-name your-db-subnet-group \
     --backup-retention-period 7 \
     --storage-encrypted
@@ -398,10 +398,10 @@ aws ec2 create-security-group \
 
 # Allow PostgreSQL access from EC2 security group
 aws ec2 authorize-security-group-ingress \
-    --group-id sg-YOUR_DB_SG_ID \
+    --group-id sg-0c8205f5e517d263d \
     --protocol tcp \
     --port 5432 \
-    --source-group sg-YOUR_EC2_SG_ID
+    --source-group sg-0c6b18fb20c16059d
 ```
 
 ### Database Schema
@@ -438,8 +438,8 @@ CREATE INDEX idx_job_logs_created_at ON job_logs(created_at);
 ```bash
 #!/bin/bash
 DATE=$(date +%Y%m%d_%H%M%S)
-pg_dump -h localhost -U photo_user photo_db_prod > /home/ubuntu/backups/photo_db_$DATE.sql
-find /home/ubuntu/backups -name "photo_db_*.sql" -mtime +7 -delete
+pg_dump -h localhost -U appuser photo_worker > /home/ubuntu/backups/photo_worker_$DATE.sql
+find /home/ubuntu/backups -name "photo_worker_*.sql" -mtime +7 -delete
 ```
 
 **Schedule backups:**
@@ -522,8 +522,8 @@ volumes:
 ### 1. **Prepare Infrastructure**
 ```bash
 # 1. Create S3 buckets
-aws s3 mb s3://your-company-photos-raw-prod --region us-west-2
-aws s3 mb s3://your-company-photos-processed-prod --region us-west-2
+aws s3 mb s3://my-raw-upload-bucket-070703032025 --region us-west-2
+aws s3 mb s3://my-ocr-processed-bucket-070703032025 --region us-west-2
 
 # 2. Create IAM role and policies (see above)
 
@@ -618,11 +618,11 @@ curl -H "Authorization: Bearer YOUR_API_KEY" \
 ```bash
 # AWS Configuration
 AWS_REGION=us-west-2
-S3_BUCKET_RAW=your-company-photos-raw-prod
-S3_BUCKET_PROCESSED=your-company-photos-processed-prod
+S3_BUCKET_RAW=my-raw-upload-bucket-070703032025
+S3_BUCKET_PROCESSED=my-ocr-processed-bucket-070703032025
 
 # Database Configuration
-DATABASE_URL=postgresql+asyncpg://photo_user:secure_password@localhost:5432/photo_db_prod
+DATABASE_URL=postgresql+asyncpg://appuser:<sensitive>@photo-dev-dev-pg.cr8uowes62h6.us-west-2.rds.amazonaws.com:5432/photo_worker
 
 # Temporal Configuration
 TEMPORAL_TARGET=your-temporal-endpoint:7233

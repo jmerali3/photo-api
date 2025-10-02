@@ -6,12 +6,12 @@ from pydantic import Field
 
 class Settings(BaseSettings):
     aws_region: str = Field(default="us-west-2")
-    s3_bucket_raw: str = Field(default="your-bucket-raw")
-    s3_bucket_processed: str = Field(default="your-bucket-processed")
+    s3_bucket_raw: str = Field(default="my-raw-upload-bucket-070703032025")
+    s3_bucket_processed: str = Field(default="my-ocr-processed-bucket-070703032025")
 
     temporal_target: str = Field(default="localhost:7233")
     temporal_namespace: str = Field(default="default")
-    temporal_task_queue: str = Field(default="image-tasks")
+    temporal_task_queue: str = Field(default="recipe-process")
 
     presign_expires_seconds: int = Field(default=300)
 
@@ -28,7 +28,9 @@ class Settings(BaseSettings):
     api_key: str = Field(default="your-secret-api-key-here")
 
     # Database
-    database_url: str = Field(default="postgresql+asyncpg://photo_user:photo_pass@localhost:5432/photo_db")
+    database_url: str = Field(
+        default="postgresql+asyncpg://appuser:<sensitive>@photo-dev-dev-pg.cr8uowes62h6.us-west-2.rds.amazonaws.com:5432/photo_worker"
+    )
 
     @property
     def cors_origins_list(self) -> List[str]:

@@ -141,8 +141,8 @@ curl http://localhost:8000/healthz
 ```bash
 # Update .env.production with actual values:
 AWS_REGION=us-west-2
-S3_BUCKET_RAW=your-company-photos-raw-prod
-S3_BUCKET_PROCESSED=your-company-photos-processed-prod
+S3_BUCKET_RAW=my-raw-upload-bucket-070703032025
+S3_BUCKET_PROCESSED=my-ocr-processed-bucket-070703032025
 TEMPORAL_TARGET=your-temporal-cluster.tmprl.cloud:7233
 CORS_ORIGINS=https://your-frontend-domain.com
 DEBUG=false

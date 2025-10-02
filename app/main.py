@@ -5,10 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from temporalio.client import Client
 
-from .settings import get_settings, Settings
-from .middleware import SecurityHeadersMiddleware
-from .routers import health, uploads, jobs, admin
-from .database import init_database, create_tables, close_db
+from app.settings import get_settings, Settings
+from app.middleware import SecurityHeadersMiddleware
+from app.routers import health, uploads, jobs, admin
+from app.database import init_database, create_tables, close_db
 
 settings: Settings = get_settings()
 

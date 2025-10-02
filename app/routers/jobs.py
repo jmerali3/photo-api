@@ -69,10 +69,17 @@ async def start_from_upload(
         await db.refresh(job_log)
 
     # Start Temporal workflow
+    workflow_input = {
+        "job_id": job_id,
+        "bucket": s.s3_bucket_raw,
+        "key": req.key,
+        "expected_content_type": obj_info.get('ContentType')
+    }
+
     try:
         await temporal_client.start_workflow(
             "image_processing_workflow",
-            {"source": "s3", "bucket": s.s3_bucket_raw, "key": req.key, "meta": req.job_metadata or {}},
+            workflow_input,
             id=job_id,
             task_queue=s.temporal_task_queue,
             retry_policy=RetryPolicy(
@@ -104,59 +111,10 @@ async def start_from_url(
     db: Optional[AsyncSession] = Depends(get_db)
 ) -> JobStatus:
     """Start an image processing job from a URL."""
-    s: Settings = get_settings()
-    if not temporal_client:
-        raise HTTPException(500, "Temporal client not initialized")
-
-    job_id: str = f"img-{uuid.uuid4()}"
-
-    # Create job log entry (if database is available)
-    job_log = None
-    if db:
-        job_log = JobLog(
-            job_id=job_id,
-            job_type="url",
-            filename=req.filename,
-            source_url=req.url,
-            job_metadata=json.dumps(req.job_metadata) if req.job_metadata else None,
-            temporal_workflow_id=job_id,
-            temporal_task_queue=s.temporal_task_queue,
-            started_at=datetime.utcnow(),
-            status="submitted"
-        )
-
-        db.add(job_log)
-        await db.commit()
-        await db.refresh(job_log)
-
-    # Start Temporal workflow
-    try:
-        await temporal_client.start_workflow(
-            "image_processing_workflow",
-            {"source": "url", "url": req.url, "filename": req.filename or "", "meta": req.job_metadata or {}},
-            id=job_id,
-            task_queue=s.temporal_task_queue,
-            retry_policy=RetryPolicy(
-                initial_interval=timedelta(seconds=1),
-                backoff_coefficient=2.0,
-                maximum_attempts=3,
-            ),
-        )
-
-        # Update status to started (if database is available)
-        if db and job_log:
-            job_log.status = "started"
-            await db.commit()
-
-    except Exception as e:
-        # Update status to failed (if database is available)
-        if db and job_log:
-            job_log.status = "failed"
-            job_log.error_message = str(e)
-            await db.commit()
-        raise HTTPException(500, f"Failed to start workflow: {str(e)}")
-
-    return JobStatus(job_id=job_id, status="started")
+    raise HTTPException(
+        status_code=501,
+        detail="URL ingestion is not implemented. Use the /jobs/from-upload endpoint instead."
+    )
 
 @router.get("/jobs/{job_id}", response_model=JobStatus)
 async def job_status(
