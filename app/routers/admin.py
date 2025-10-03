@@ -1,5 +1,5 @@
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
@@ -8,7 +8,14 @@ from ..auth import get_current_user
 
 router: APIRouter = APIRouter()
 
-@router.get("/admin/jobs")
+@router.get(
+    "/admin/jobs",
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "Missing or invalid API key"},
+        status.HTTP_503_SERVICE_UNAVAILABLE: {"description": "Database not available"},
+    },
+)
 async def list_jobs(
     limit: int = Query(10, ge=1, le=100),
     offset: int = Query(0, ge=0),
@@ -22,7 +29,7 @@ async def list_jobs(
     Admin endpoint for viewing job history and status.
     """
     if not db:
-        raise HTTPException(503, "Database not available")
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Database not available")
 
     query = select(JobLog)
 

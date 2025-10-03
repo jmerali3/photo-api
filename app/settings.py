@@ -1,11 +1,12 @@
 import os
 from functools import lru_cache
-from typing import List
+from typing import List, Optional
 from pydantic_settings import BaseSettings
 from pydantic import Field
 
 class Settings(BaseSettings):
     aws_region: str = Field(default="us-west-2")
+    aws_profile: Optional[str] = Field(default=None)
     s3_bucket_raw: str = Field(default="my-raw-upload-bucket-070703032025")
     s3_bucket_processed: str = Field(default="my-ocr-processed-bucket-070703032025")
 

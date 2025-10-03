@@ -2,7 +2,7 @@ import uuid
 import json
 from datetime import timedelta, datetime
 from typing import Optional, Dict, Any
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from temporalio.client import Client
@@ -24,7 +24,17 @@ def set_temporal_client(client: Client) -> None:
     global temporal_client
     temporal_client = client
 
-@router.post("/jobs/from-upload", response_model=JobStatus)
+@router.post(
+    "/jobs/from-upload",
+    response_model=JobStatus,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"description": "S3 object not accessible"},
+        status.HTTP_401_UNAUTHORIZED: {"description": "Missing or invalid API key"},
+        status.HTTP_502_BAD_GATEWAY: {"description": "Temporal workflow could not be started"},
+        status.HTTP_503_SERVICE_UNAVAILABLE: {"description": "Temporal client not initialized"},
+    },
+)
 async def start_from_upload(
     req: FromUploadRequest,
     current_user: Dict[str, Any] = Depends(get_current_user),
@@ -38,10 +48,10 @@ async def start_from_upload(
     try:
         obj_info = s3.head_object(Bucket=s.s3_bucket_raw, Key=req.key)
     except Exception:
-        raise HTTPException(400, f"S3 object not found or not accessible: {req.key}")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"S3 object not found or not accessible: {req.key}")
 
     if not temporal_client:
-        raise HTTPException(500, "Temporal client not initialized")
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Temporal client not initialized")
 
     job_id: str = f"img-{uuid.uuid4()}"
 
@@ -100,11 +110,16 @@ async def start_from_upload(
             job_log.status = "failed"
             job_log.error_message = str(e)
             await db.commit()
-        raise HTTPException(500, f"Failed to start workflow: {str(e)}")
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Failed to start workflow: {str(e)}")
 
     return JobStatus(job_id=job_id, status="started")
 
-@router.post("/jobs/from-url", response_model=JobStatus)
+@router.post(
+    "/jobs/from-url",
+    response_model=JobStatus,
+    status_code=status.HTTP_501_NOT_IMPLEMENTED,
+    responses={status.HTTP_501_NOT_IMPLEMENTED: {"description": "URL ingestion not yet implemented"}},
+)
 async def start_from_url(
     req: FromURLRequest,
     current_user: Dict[str, Any] = Depends(get_current_user),
@@ -116,7 +131,16 @@ async def start_from_url(
         detail="URL ingestion is not implemented. Use the /jobs/from-upload endpoint instead."
     )
 
-@router.get("/jobs/{job_id}", response_model=JobStatus)
+@router.get(
+    "/jobs/{job_id}",
+    response_model=JobStatus,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "Missing or invalid API key"},
+        status.HTTP_404_NOT_FOUND: {"description": "Job not found"},
+        status.HTTP_503_SERVICE_UNAVAILABLE: {"description": "Temporal client not initialized"},
+    },
+)
 async def job_status(
     job_id: str,
     current_user: Dict[str, Any] = Depends(get_current_user),
@@ -124,14 +148,14 @@ async def job_status(
 ) -> JobStatus:
     """Get the status and result of a job."""
     if not temporal_client:
-        raise HTTPException(500, "Temporal client not initialized")
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Temporal client not initialized")
 
     # Get job log from database (if available)
     job_log = None
     if db:
         job_log = await db.get(JobLog, job_id)
         if not job_log:
-            raise HTTPException(404, f"Job not found: {job_id}")
+            raise HTTPException(status.HTTP_404_NOT_FOUND, f"Job not found: {job_id}")
 
     try:
         handle = temporal_client.get_workflow_handle(job_id)
@@ -173,4 +197,4 @@ async def job_status(
             job_log.status = "unknown"
             job_log.error_message = f"Temporal query failed: {str(e)}"
             await db.commit()
-        raise HTTPException(404, f"Job not found in Temporal: {job_id}")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Job not found in Temporal: {job_id}")

@@ -1,0 +1,72 @@
+@baseUrl = http://localhost:8000
+@apiKey = dev-api-key-replace-me-in-production
+@contentType = image/jpeg
+@maxBytes = 5242880
+
+### Health check
+GET {{baseUrl}}/healthz
+
+> {%
+  client.test("healthz returns 200", function () {
+    client.assert(response.status === 200);
+  });
+%}
+
+### Request a presigned upload for an image asset
+POST {{baseUrl}}/uploads/init
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "content_type": "{{contentType}}",
+  "max_bytes": {{maxBytes}},
+  "key_prefix": "test-http"
+}
+
+> {%
+  client.test("presign success", function () {
+    client.assert(response.status === 200);
+    client.assert(response.body.url, "expected presign URL");
+    client.assert(response.body.key, "expected S3 key");
+  });
+  client.global.set("uploadKey", response.body.key);
+  client.global.set("presignUrl", response.body.url);
+  client.global.set("presignFields", JSON.stringify(response.body.fields, null, 2));
+%}
+
+### Start a job for the uploaded asset
+# Before executing this request, upload your file to S3 using the presigned URL/fields.
+# Example (from terminal):
+# curl -X POST "$presignUrl" \\
+#   $(printf -- '--form %s=%s ' $(jq -r 'to_entries[] | .key + "=" + .value' <<< "$presignFields")) \\
+#   --form "file=@/path/to/image.jpg"
+POST {{baseUrl}}/jobs/from-upload
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "key": "{{uploadKey}}",
+  "job_metadata": {
+    "source": "rest-client",
+    "author": "Your Name"
+  }
+}
+
+> {%
+  client.test("job submission accepted", function () {
+    client.assert(response.status === 200);
+    client.assert(response.body.job_id, "expected job_id in body");
+  });
+  client.global.set("lastJobId", response.body.job_id);
+%}
+
+### Poll the job status
+GET {{baseUrl}}/jobs/{{lastJobId}}
+Authorization: Bearer {{apiKey}}
+
+> {%
+  client.test("job status returns", function () {
+    client.assert(response.status === 200);
+  });
+%}
+

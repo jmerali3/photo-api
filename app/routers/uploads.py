@@ -1,7 +1,7 @@
 import time
 import uuid
 from typing import Optional, Dict, Any
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 
 from ..models import InitUploadRequest, InitUploadResponse
 from ..settings import get_settings, Settings
@@ -16,14 +16,22 @@ def _new_s3_key(prefix: Optional[str], ext: str) -> str:
         base = f"{prefix.rstrip('/')}/{base}"
     return f"{base}{ext}"
 
-@router.post("/uploads/init", response_model=InitUploadResponse)
+@router.post(
+    "/uploads/init",
+    response_model=InitUploadResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "Missing or invalid API key"},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"description": "Failed to generate presign URL"},
+    },
+)
 def init_upload(
     req: InitUploadRequest,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ) -> InitUploadResponse:
     """Initialize a presigned upload URL for S3."""
     s: Settings = get_settings()
-    s3: Any = get_s3_client()
+    s3 = get_s3_client()
 
     ext_map: Dict[str, str] = {
         "image/jpeg": ".jpg",
